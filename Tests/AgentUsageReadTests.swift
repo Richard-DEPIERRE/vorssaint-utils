@@ -70,6 +70,7 @@ enum AgentUsageReadTests {
         var store = AgentUsageStore()
         var enabled: Set<AgentProvider> = []
         var readerClaudeProfile = ClaudeAccountProfile()
+        var readerClaudeProfiles: [ClaudeAccountProfile] = []
         var previousLimits: [AgentProvider: AgentLimits] = [:]
         var budgetDay: Date?
         var snapshot = AgentUsageSnapshot()

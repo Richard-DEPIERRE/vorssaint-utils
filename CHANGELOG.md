@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- AI Agents can show limits for several Claude accounts at once. Each Claude Code profile you add (`CLAUDE_CONFIG_DIR`) gets its own Limits card, falls back on the limits saved by the Claude app started with the matching data folder, and its sessions count toward spending. Settings → Dynamic Island → Content → AI Agents → Claude accounts.
+
 ## [3.4.3] - 2026-10-29
 
 ### Summary

@@ -18,7 +18,13 @@ enum AgentClaudeAppUsage {
     private static let maximumSize = 4 << 20
 
     static func historyURL(home: URL) -> URL {
-        home.appending(path: "Library/Application Support/Claude/plan-usage-history.json", directoryHint: .notDirectory)
+        historyURL(appData: home.appending(path: "Library/Application Support/Claude", directoryHint: .isDirectory))
+    }
+
+    /// The same file in a Claude app's own data folder, as a second copy
+    /// started with another one keeps it.
+    static func historyURL(appData: URL) -> URL {
+        appData.appending(path: "plan-usage-history.json", directoryHint: .notDirectory)
     }
 
     /// When the app last saved its limits, straight from the file.

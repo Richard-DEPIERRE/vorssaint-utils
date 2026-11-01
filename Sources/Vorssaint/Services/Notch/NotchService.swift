@@ -884,13 +884,15 @@ final class NotchService: ObservableObject {
         let accounts = NotchAgentSupport.showsCodexAccounts() ? CodexProfileLimitsService.shared.states.map(\.id) : []
         let claudeProfile = AgentUsageService.shared.claudeProfile
         let claudeAccount = claudeProfile.isDefault ? nil : claudeProfile.id
-        guard usage.loaded || !accounts.isEmpty else { return nil }
+        let claudeAccounts = NotchAgentSupport.showsClaudeAccounts()
+            ? ClaudeProfileLimitsService.shared.states.map(\.id) : []
+        guard usage.loaded || !accounts.isEmpty || !claudeAccounts.isEmpty else { return nil }
         let providers = enabled.filter { usage.seen.contains($0) || ($0 == .codex && !accounts.isEmpty)
-            || ($0 == .claude && claudeAccount != nil) }
+            || ($0 == .claude && (claudeAccount != nil || !claudeAccounts.isEmpty)) }
         guard !providers.isEmpty else { return 0 }
         return NotchAgentSupport.contentHeight(NotchAgentSupport.rows(
             NotchAgentSupport.tiles(cards: NotchAgentSupport.cards(), providers: providers, codexAccounts: accounts,
-                                    claudeAccount: claudeAccount),
+                                    claudeAccount: claudeAccount, claudeAccounts: claudeAccounts),
             width: width))
     }
     var expandedGeometry: NotchGeometry {
@@ -4170,6 +4172,17 @@ final class NotchService: ObservableObject {
                 }.store(in: &subscriptions)
             // An added or removed Codex account adds or removes a card.
             CodexProfileLimitsService.shared.$states
+                .map { $0.map(\.id) }
+                .removeDuplicates()
+                .dropFirst()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self, self.selected == .agents else { return }
+                    self.objectWillChange.send()
+                    self.refreshPresentation()
+                }.store(in: &subscriptions)
+            // So does a Claude account.
+            ClaudeProfileLimitsService.shared.$states
                 .map { $0.map(\.id) }
                 .removeDuplicates()
                 .dropFirst()

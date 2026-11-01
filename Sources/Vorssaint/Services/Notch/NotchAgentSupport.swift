@@ -121,6 +121,11 @@ enum NotchAgentSupport {
         providers(in: defaults).contains(.codex) && !hiddenCards(in: defaults).contains(.limits)
     }
 
+    /// Added Claude accounts too.
+    static func showsClaudeAccounts(in defaults: UserDefaults = .standard) -> Bool {
+        providers(in: defaults).contains(.claude) && !hiddenCards(in: defaults).contains(.limits)
+    }
+
     static func period(in defaults: UserDefaults = .standard) -> AgentPeriod {
         AgentPeriod(rawValue: defaults.string(forKey: DefaultsKey.notchAgentsPeriod) ?? "") ?? .today
     }
@@ -291,13 +296,18 @@ enum NotchAgentSupport {
     /// Below this width every card takes a row of its own.
     static let pairWidth: CGFloat = 390
 
-    /// Codex homes the person added take the place of Codex's one limits
-    /// card, the usual home among them when they add it.
+    /// Codex homes and Claude profiles the person added take the place of
+    /// that agent's one limits card, the usual login among them when they
+    /// add it.
     static func tiles(cards: [NotchAgentCard], providers: [AgentProvider],
-                      codexAccounts: [String] = [], claudeAccount: String? = nil) -> [NotchAgentTile] {
+                      codexAccounts: [String] = [], claudeAccount: String? = nil,
+                      claudeAccounts: [String] = []) -> [NotchAgentTile] {
         cards.flatMap { card -> [NotchAgentTile] in
             switch card {
             case .limits: return providers.filter(\.reportsLimits).flatMap { provider -> [NotchAgentTile] in
+                if provider == .claude, !claudeAccounts.isEmpty {
+                    return claudeAccounts.map { NotchAgentTile(card: .limits, provider: provider, accountID: $0) }
+                }
                 if provider == .claude, let claudeAccount {
                     return [NotchAgentTile(card: .limits, provider: provider, accountID: claudeAccount)]
                 }

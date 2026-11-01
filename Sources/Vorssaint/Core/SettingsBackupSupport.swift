@@ -135,6 +135,7 @@ enum SettingsBackupSupport {
         // never settings to bring to another one.
         DefaultsKey.notchAgentsCodexProfiles,
         DefaultsKey.notchAgentsClaudeProfile,
+        DefaultsKey.notchAgentsClaudeProfiles,
         DefaultsKey.dockPreviewRestoreAutohide,
         // The Space arrangement setting to put back, and a Dock restart still
         // owed, belong to this Mac's Dock.

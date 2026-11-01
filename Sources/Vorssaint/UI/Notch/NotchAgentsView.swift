@@ -8,6 +8,7 @@ struct NotchAgentsView: View {
     let size: CGSize
     @ObservedObject private var usage = AgentUsageService.shared
     @ObservedObject private var accounts = CodexProfileLimitsService.shared
+    @ObservedObject private var claudeProfiles = ClaudeProfileLimitsService.shared
     @ObservedObject private var l10n = L10n.shared
     @Environment(\.notchSettingsPreview) private var preview
     @AppStorage(DefaultsKey.notchAgentsPeriod) private var period = AgentPeriod.today.rawValue
@@ -29,12 +30,18 @@ struct NotchAgentsView: View {
         return NotchAgentSupport.showsCodexAccounts() ? accounts.states : []
     }
 
+    /// The Claude profiles the person added, likewise.
+    private var claudeAccounts: [ClaudeProfileLimitsState] {
+        _ = (claude, hiddenCards)
+        return NotchAgentSupport.showsClaudeAccounts() ? claudeProfiles.states : []
+    }
+
     /// Only agents that left something on this Mac, or whose accounts were
     /// added, get cards.
     private var providers: [AgentProvider] {
         [claude ? AgentProvider.claude : nil, codex ? .codex : nil, opencode ? .opencode : nil, copilot ? .copilot : nil].compactMap { $0 }
             .filter { usage.snapshot.seen.contains($0) || ($0 == .codex && !codexAccounts.isEmpty)
-                || ($0 == .claude && !usage.claudeProfile.isDefault) }
+                || ($0 == .claude && (!usage.claudeProfile.isDefault || !claudeAccounts.isEmpty)) }
     }
 
     private var rows: [[NotchAgentTile]] {
@@ -42,13 +49,14 @@ struct NotchAgentsView: View {
         _ = (cardOrder, hiddenCards)
         return NotchAgentSupport.rows(NotchAgentSupport.tiles(cards: NotchAgentSupport.cards(), providers: providers,
                                                               codexAccounts: codexAccounts.map(\.id),
-                                                              claudeAccount: usage.claudeProfile.isDefault ? nil : usage.claudeProfile.id),
+                                                              claudeAccount: usage.claudeProfile.isDefault ? nil : usage.claudeProfile.id,
+                                                              claudeAccounts: claudeAccounts.map(\.id)),
                                       width: size.width)
     }
 
     var body: some View {
         Group {
-            if !usage.snapshot.loaded && codexAccounts.isEmpty {
+            if !usage.snapshot.loaded && codexAccounts.isEmpty && claudeAccounts.isEmpty {
                 VStack(spacing: 10) {
                     ProgressView().controlSize(.small)
                     Text(text.loading).font(.system(size: 11)).foregroundStyle(.secondary)
@@ -80,11 +88,13 @@ struct NotchAgentsView: View {
         .onAppear {
             usage.pageDidAppear(preview: preview)
             accounts.pageDidAppear(preview: preview)
+            claudeProfiles.pageDidAppear(preview: preview)
         }
         .onDisappear {
             guard !preview else { return }
             usage.pageDidDisappear()
             accounts.pageDidDisappear()
+            claudeProfiles.pageDidDisappear()
         }
     }
 
@@ -117,7 +127,7 @@ struct NotchAgentsView: View {
                 NotchAgentLimitsCard(provider: provider, snapshot: snapshot, now: now,
                                      display: NotchAgentLimitDisplay(rawValue: display) ?? .remaining, text: text,
                                      account: account(tile, now: now),
-                                     accountName: provider == .claude ? claudeAccountName : nil)
+                                     accountName: provider == .claude && tile.accountID == nil ? claudeAccountName : nil)
             }
         case .spend:
             NotchAgentSpendCard(snapshot: snapshot, providers: providers, period: shown, text: text)
@@ -139,6 +149,15 @@ struct NotchAgentsView: View {
     }
 
     private func account(_ tile: NotchAgentTile, now: Date) -> NotchAgentAccount? {
+        if tile.provider == .claude, let id = tile.accountID, let state = claudeAccounts.first(where: { $0.id == id }) {
+            let strings = FeatureStrings.codexAccounts(l10n.language)
+            let name = state.email.map { state.entry.name + " · " + $0 } ?? state.entry.name
+            return NotchAgentAccount(name: name, limits: state.currentLimits(at: now), plan: state.plan,
+                                     checking: state.checking, failure: state.failure.map(text.claudeCode),
+                                     refreshHint: strings.refreshHint, checkLabel: strings.check) {
+                claudeProfiles.refresh(id: id, force: true)
+            }
+        }
         if tile.provider == .claude, tile.accountID != nil {
             let strings = FeatureStrings.codexAccounts(l10n.language)
             return NotchAgentAccount(name: claudeAccountName, limits: usage.snapshot.limits[.claude],
